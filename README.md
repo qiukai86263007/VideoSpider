@@ -22,12 +22,6 @@
 - 用户管理
 - 反馈管理
 
-**演示地址**
-
-- 前台演示
-[http://v.gitapp.cn/](http://v.gitapp.cn/)
-- 后台演示
-[http://v.gitapp.cn/myadmin](http://v.gitapp.cn/myadmin)
 
 **后台测试帐号**
 
@@ -49,15 +43,10 @@
 ![](https://github.com/geeeeeeeek/videoproject/blob/master/static/img/demo04.png)
 
 
-### 适合人群
-
-python初级学员、大学生、系统设计人员
 
 ### 技术栈
 python/django/nginx/mysql/semantic-css/jquery/html
 
-### 源码
-[https://github.com/geeeeeeeek/videoproject/](https://github.com/geeeeeeeek/videoproject/)
 
 ### 开发文档
 
@@ -73,8 +62,3 @@ pip install -r requirement.txt
 
 运行 python manage.py runserver 即可
 
- 
-
-### 付费咨询
-
-微信: lengqin1024

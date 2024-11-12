@@ -3,6 +3,8 @@ import requests
 import sys
 import os
 import logging
+import configparser
+import fcntl
 from logging.handlers import RotatingFileHandler
 from multiprocessing import Pool
 
@@ -25,28 +27,33 @@ formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
 handler.setFormatter(formatter)
 logger.addHandler(handler)
 
+# Read configuration from config.ini
+config = configparser.ConfigParser()
+config.read(os.path.join(current_dir, 'config', 'config.ini'))
+proxy_url = config.get('main', 'proxy_url', fallback=None)
 
-# def extract_video_id(url):
-#     pattern = r'(?<=v=)[a-zA-Z0-9_-]+'
-#     match = re.search(pattern, url)
-#     if match:
-#         return match.group(0)
-#     else:
-#         return None
 
-def is_valid_url(url):
+
+def is_valid_url(url, proxy_url=None):
     try:
-        response = requests.head(url, allow_redirects=True)
+        proxies = {"http": proxy_url, "https": proxy_url} if proxy_url else None
+        response = requests.head(url, allow_redirects=True, proxies=proxies, timeout=2)
         return response.status_code == 200
     except requests.RequestException as e:
         logging.error(f"Error validating URL {url}: {e}")
         return False
 
+# 判断代理能否翻墙
+def is_valid_proxy(proxy_url):
+    try:
+        response = requests.get('https://www.youtube.com/', proxies={"http": proxy_url, "https": proxy_url}, timeout=10)
+        return response.status_code == 200
+    except requests.RequestException as e:
+        logging.error(f"Error validating proxy {proxy_url}: {e}")
+        return False
 
 def download_video(url):
-    if not is_valid_url(url):
-        logging.error(f"Invalid URL: {url}")
-        return
+
     try:
         yt_dlp_dir = os.path.abspath(os.path.join(os.getcwd(), '..','yt-dlp', 'yt_dlp'))
         # Set the arguments for yt-dlp
@@ -56,9 +63,16 @@ def download_video(url):
             '--write-thumbnail',
             '--convert-thumbnails', 'jpg',
             '--merge-output-format', 'mp4',
-            '-o', os.path.join(current_dir, 'video', '%(uploader)s_%(id)s_%(title)s.%(ext)s'),
+            '-o', os.path.join(current_dir, '..', 'upload', '%(id)s_%(title)s.%(ext)s'),
             url
         ]
+        # If we have proxy_url and accessible, add it to the arguments
+        if proxy_url and is_valid_proxy(proxy_url):
+            sys.argv.extend(['--proxy', proxy_url])
+        # if not valid url return
+        if not is_valid_url(url, proxy_url):
+            logging.error(f"Invalid URL: {url}")
+            return
         logger.info(f"Downloading video from URL: {url}")
         import yt_dlp
         yt_dlp.main()
@@ -89,4 +103,12 @@ def main():
     logger.info("All videos downloaded successfully.")
 
 if __name__ == "__main__":
-    main()
+    lock_file_path = os.path.join(current_dir, 'script.lock')
+    with open(lock_file_path, 'w') as lock_file:
+        try:
+            # Try to acquire an exclusive lock on the file
+            fcntl.flock(lock_file, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            main()
+        except IOError:
+            logging.error("Another instance of the script is already running.")
+            sys.exit(1)

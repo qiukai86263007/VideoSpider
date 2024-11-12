@@ -167,7 +167,6 @@ from .utils.networking import (
 )
 from crawler_script.database import db_tools
 from .version import CHANNEL, ORIGIN, RELEASE_GIT_HEAD, VARIANT, __version__
-from crawler_script.database import db_tools
 
 if compat_os_name == 'nt':
     import ctypes
@@ -3033,10 +3032,16 @@ class YoutubeDL:
 
         # We update the info dict with the selected best quality format (backwards compatibility)
         info_dict.update(best_format)
+        self.update_info_2db(info_dict, new_info)
         return info_dict
 
-    def update_info_2db(self, info_dict):
-        pass
+    def update_info_2db(self, info_dict, new_info):
+        # text title coverpath videopath
+        classfication = db_tools.set_classification(info_dict['title'])
+        file_path = os.path.basename(new_info['filename']).replace(' ','\ ')
+        cover_path = os.path.basename(info_dict['thumbnails'][-1]['filepath']).replace(' ','\ ')
+        db_tools.upload_video(info_dict['title'], info_dict['description'], classfication, file_path,cover_path)
+
     def process_subtitles(self, video_id, normal_subtitles, automatic_captions):
         """Select the requested subtitles and their format"""
         available_subs, normal_sub_langs = {}, []
