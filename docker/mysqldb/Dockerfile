@@ -1,4 +1,4 @@
-# Use an official MySQL 5.7 image as a base
+# Use an official MySQL 8.0 image as a base
 FROM mysql:8.0
 
 # Install Python 3.10 and other dependencies

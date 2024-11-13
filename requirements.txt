@@ -7,5 +7,3 @@ pillow==9.1.1
 drf_yasg==1.21.8
 djangorestframework==3.12.4
 cryptography==43.0.3
-ytd==2024.11.4
-ffmpeg==1.4

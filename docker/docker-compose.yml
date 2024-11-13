@@ -1,13 +1,13 @@
-version: '3'
-
 services:
-  db:
+  mysqldb:
     image: mysql:8
     restart: always
+    build:
+      context: ./mysqldb
     environment:
       MYSQL_ROOT_PASSWORD: Admin1234!
       MYSQL_DATABASE: video
     ports:
       - "3306:3306"
     volumes:
-      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+      - ./mysqldb/sql/init.sql:/docker-entrypoint-initdb.d/init.sql
