@@ -3032,14 +3032,16 @@ class YoutubeDL:
 
         # We update the info dict with the selected best quality format (backwards compatibility)
         info_dict.update(best_format)
-        self.update_info_2db(info_dict, new_info)
+        # if really download update the video table
+        if new_info['__real_download']:
+            self.update_info_2db(info_dict, new_info)
         return info_dict
 
     def update_info_2db(self, info_dict, new_info):
         # text title coverpath videopath
-        classfication = db_tools.set_classification(info_dict['title'])
-        file_path = os.path.basename(new_info['filename']).replace(' ','\ ')
-        cover_path = os.path.basename(info_dict['thumbnails'][-1]['filepath']).replace(' ','\ ')
+        classfication = db_tools.set_classification(info_dict['extractor_key'])
+        file_path = os.path.basename(new_info['filename'])
+        cover_path = os.path.basename(info_dict['thumbnails'][-1]['filepath'])
         db_tools.upload_video(info_dict['title'], info_dict['description'], classfication, file_path,cover_path)
 
     def process_subtitles(self, video_id, normal_subtitles, automatic_captions):

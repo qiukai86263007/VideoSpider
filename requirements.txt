@@ -7,3 +7,4 @@ pillow==9.1.1
 drf_yasg==1.21.8
 djangorestframework==3.12.4
 cryptography==43.0.3
+requests==2.32.3

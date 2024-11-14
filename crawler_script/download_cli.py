@@ -63,7 +63,7 @@ def download_video(url):
             '--write-thumbnail',
             '--convert-thumbnails', 'jpg',
             '--merge-output-format', 'mp4',
-            '-o', os.path.join(current_dir, '..', 'upload', '%(id)s_%(title)s.%(ext)s'),
+            '-o', os.path.join(current_dir, '..', 'upload', '%(id)s.%(ext)s'),
             url
         ]
         # If we have proxy_url and accessible, add it to the arguments
