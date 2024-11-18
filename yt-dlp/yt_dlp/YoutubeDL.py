@@ -3030,11 +3030,11 @@ class YoutubeDL:
             if max_downloads_reached:
                 raise MaxDownloadsReached
 
-        # We update the info dict with the selected best quality format (backwards compatibility)
-        info_dict.update(best_format)
-        # if really download update the video table
-        if new_info['__real_download']:
-            self.update_info_2db(info_dict, new_info)
+            # We update the info dict with the selected best quality format (backwards compatibility)
+            info_dict.update(best_format)
+            # if really download update the video table
+            if new_info['__real_download']:
+                self.update_info_2db(info_dict, new_info)
         return info_dict
 
     def update_info_2db(self, info_dict, new_info):

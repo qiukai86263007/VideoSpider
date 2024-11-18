@@ -775,6 +775,7 @@ from .googlepodcasts import (
     GooglePodcastsIE,
 )
 from .googlesearch import GoogleSearchIE
+from .apnewssearch import ApnewsSearchURLIE
 from .goplay import GoPlayIE
 from .gopro import GoProIE
 from .goshgay import GoshgayIE

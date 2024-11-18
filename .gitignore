@@ -1,2 +1,4 @@
 .idea
 upload
+crawler_script/logs/download_log.log
+crawler_script/script.lock

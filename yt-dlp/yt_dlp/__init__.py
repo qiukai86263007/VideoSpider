@@ -67,6 +67,7 @@ from .utils import (
 from .utils.networking import std_headers
 from .utils._utils import _UnsafeExtensionError
 from .YoutubeDL import YoutubeDL
+from crawler_script.common.logging_tools import logger
 
 _IN_CLI = False
 
@@ -989,7 +990,8 @@ def _real_main(argv=None):
     # See https://github.com/yt-dlp/yt-dlp/issues/2191
     if opts.ffmpeg_location:
         FFmpegPostProcessor._ffmpeg_location.set(opts.ffmpeg_location)
-
+    # add customized logger, develop mode could comment below line
+    # ydl_opts['logger'] = logger
     with YoutubeDL(ydl_opts) as ydl:
         pre_process = opts.update_self or opts.rm_cachedir
         actual_use = all_urls or opts.load_info_filename

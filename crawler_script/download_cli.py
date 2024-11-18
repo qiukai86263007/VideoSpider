@@ -5,8 +5,8 @@ import os
 import logging
 import configparser
 import fcntl
-from logging.handlers import RotatingFileHandler
 from multiprocessing import Pool
+from crawler_script.common.logging_tools import logger
 
 # Add yt-dlp/yt_dlp directory to sys.path
 child_project_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '..','yt-dlp'))
@@ -14,18 +14,6 @@ sys.path.append(child_project_path)
 # 当前目录
 current_dir = os.getcwd()
 # 设置日志记录
-logger = logging.getLogger('MyLogger')
-logger.setLevel(logging.INFO)
-
-# Add the log message handler to the logger
-handler = RotatingFileHandler(
-    os.path.join(current_dir, 'logs','download_log.log'),
-    maxBytes=5 * 1024 * 1024,  # 5 MB
-    backupCount=5  # Keep up to 5 backup files
-)
-formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
-handler.setFormatter(formatter)
-logger.addHandler(handler)
 
 # Read configuration from config.ini
 config = configparser.ConfigParser()
@@ -63,6 +51,9 @@ def download_video(url):
             '--write-thumbnail',
             '--convert-thumbnails', 'jpg',
             '--merge-output-format', 'mp4',
+            '--sleep-subtitles','1' ,
+            '--sleep-requests','1',
+            '--sleep-interval','1',
             '-o', os.path.join(current_dir, '..', 'upload', '%(id)s.%(ext)s'),
             url
         ]
