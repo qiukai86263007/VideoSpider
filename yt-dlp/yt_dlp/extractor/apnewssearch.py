@@ -1,8 +1,46 @@
 import itertools
 import re
-import urllib.parse
 from .common import InfoExtractor
 from ..utils import parse_qs
+
+
+class ApnewsIE(InfoExtractor):
+    IE_NAME = 'apnews'
+    IE_DESC = 'apnews.com'
+    _VALID_URL = r'https://apnews\.com/video/(?P<id>[^/]+)'
+    _NETRC_MACHINE = 'apnews'
+
+    _TESTS = [{
+        'url': 'https://apnews.com/video/judge-delays-ruling-in-trumps-hush-money-case-0000019322bdd461ad9f7efd37520000',
+        'info_dict': {
+            'id': 'kevin',
+            'title': 'kevin is nice man',
+        },
+        'playlist_mincount': 45,
+        'params': {
+            'playlistend': 45,
+        },
+    }]
+
+    def _real_extract(self, url):
+        video_id = self._match_id(url)
+
+        webpage, urlh = self._download_webpage_handle(url, video_id)
+        if not self._match_valid_url(urlh.url):
+            return self.url_result(urlh.url)
+        video_url = self._html_search_meta('og:video', webpage, 'og:video')
+        formats = []
+        if video_url:
+            formats.extend(self._extract_m3u8_formats(
+                video_url, video_id, 'mp4', entry_protocol='m3u8_native',
+                m3u8_id='hls', fatal=False))
+        return {
+            'id': video_id,
+            'formats': formats,
+            'title': self._generic_title('', webpage, default='video'),
+            'description': self._og_search_description(webpage, default=None),
+            'thumbnail': self._og_search_thumbnail(webpage, default=None),
+        }
 
 
 class ApnewsSearchBaseIE(InfoExtractor):
@@ -10,20 +48,11 @@ class ApnewsSearchBaseIE(InfoExtractor):
 
     def _entries(self, url, item_id, query=None, note='Downloading page %(page)s'):
         query = query or {}
-        # pages = [query['page']] if 'page' in query else itertools.count(1)
-        # for page_num in pages:
-        #     query['page'] = str(page_num)
-        #     webpage = self._download_webpage(url, item_id, query=query, note=note % {'page': page_num})
-        #     results = re.findall(r'(?<=data-video-id=)["\']?(?P<videoid>.*?)(?=["\'])', webpage)
-        #     for item in results:
-        #         yield self.url_result(f'https://www.nicovideo.jp/watch/{item}', 'Niconico', item)
-        #     if not results:
-        #         break
         pages = [query['p']] if 'p' in query else itertools.count(1)
         for page_num in pages:
             query['p'] = str(page_num)
             webpage = self._download_webpage(
-                url, item_id,query=query,note=note % {'page': page_num})
+                url, item_id, query=query, note=note % {'page': page_num})
             findlist = list(set(re.findall(r'https://apnews\.com/video/[^"]+', webpage)))
             for url_items in findlist:
                 yield self.url_result(url_items)
@@ -51,21 +80,6 @@ class ApnewsSearchURLIE(ApnewsSearchBaseIE):
         },
     }]
     _PAGE_SIZE = 100
-
-    # def _search_results(self, query, url):
-    #     for pagenum in itertools.count():
-    #         webpage = self._download_webpage(
-    #             url, query,
-    #             note=f'Downloading result page {pagenum + 1}',
-    #             query={
-    #                 'q': query
-    #             })
-    #         findlist = re.findall(r'href="https://apnews\.com/video/[^"]+"', webpage)
-    #         for url in list(set(findlist)):
-    #             yield self.url_result(url)
-    #
-    #         if not re.search(r'id="pnnext"', webpage):
-    #             return
 
     def _real_extract(self, url):
         qs = parse_qs(url)

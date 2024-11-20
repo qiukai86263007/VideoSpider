@@ -3042,7 +3042,7 @@ class YoutubeDL:
         classfication = db_tools.set_classification(info_dict['extractor_key'])
         file_path = os.path.basename(new_info['filename'])
         cover_path = os.path.basename(info_dict['thumbnails'][-1]['filepath'])
-        db_tools.upload_video(info_dict['title'], info_dict['description'], classfication, file_path,cover_path)
+        db_tools.upload_video(info_dict.get('title', 'N/A'), info_dict.get('description', 'N/A'), classfication, file_path,cover_path)
 
     def process_subtitles(self, video_id, normal_subtitles, automatic_captions):
         """Select the requested subtitles and their format"""

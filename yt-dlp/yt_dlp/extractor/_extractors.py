@@ -776,6 +776,10 @@ from .googlepodcasts import (
 )
 from .googlesearch import GoogleSearchIE
 from .apnewssearch import ApnewsSearchURLIE
+from .reuterssearch import ReutersSearchURLIE
+from .afpsearch import AfpSearchURLIE
+from .afpsearch import AfpIE
+from .apnewssearch import ApnewsIE
 from .goplay import GoPlayIE
 from .gopro import GoProIE
 from .goshgay import GoshgayIE

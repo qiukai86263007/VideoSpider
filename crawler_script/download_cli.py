@@ -22,15 +22,6 @@ proxy_url = config.get('main', 'proxy_url', fallback=None)
 
 
 
-def is_valid_url(url, proxy_url=None):
-    try:
-        proxies = {"http": proxy_url, "https": proxy_url} if proxy_url else None
-        response = requests.head(url, allow_redirects=True, proxies=proxies, timeout=2)
-        return response.status_code == 200
-    except requests.RequestException as e:
-        logging.error(f"Error validating URL {url}: {e}")
-        return False
-
 # 判断代理能否翻墙
 def is_valid_proxy(proxy_url):
     try:
@@ -52,18 +43,16 @@ def download_video(url):
             '--convert-thumbnails', 'jpg',
             '--merge-output-format', 'mp4',
             '--sleep-subtitles','1' ,
-            '--sleep-requests','1',
+            # '--sleep-requests','1',
             '--sleep-interval','1',
+            '--username', '4684390@qq.com',
+            '--password', 'Qk4684390!',
             '-o', os.path.join(current_dir, '..', 'upload', '%(id)s.%(ext)s'),
             url
         ]
         # If we have proxy_url and accessible, add it to the arguments
         if proxy_url and is_valid_proxy(proxy_url):
             sys.argv.extend(['--proxy', proxy_url])
-        # if not valid url return
-        if not is_valid_url(url, proxy_url):
-            logging.error(f"Invalid URL: {url}")
-            return
         logger.info(f"Downloading video from URL: {url}")
         import yt_dlp
         yt_dlp.main()
