@@ -54,11 +54,11 @@ class ApnewsSearchBaseIE(InfoExtractor):
             webpage = self._download_webpage(
                 url, item_id, query=query, note=note % {'page': page_num})
             findlist = list(set(re.findall(r'https://apnews\.com/video/[^"]+', webpage)))
+            if not findlist:
+                return
             for url_items in findlist:
                 yield self.url_result(url_items)
 
-            if not findlist:
-                return
 
     def _search_results(self, query, url):
         return self._entries(url, query)
@@ -69,7 +69,7 @@ class ApnewsSearchURLIE(ApnewsSearchBaseIE):
     IE_NAME = 'apnews:search_url'
     _VALID_URL = r'https?://(?:www\.)?apnews\.com/search(?:/(?P<filter>communities|users|games))?(?:\?|\#!?)(?:.*?[&;])??q=(?P<id>(?:[^&#]+)+)'
     _TESTS = [{
-        'url': 'https://apnews.com/search?q=trump&p=2',
+        'url': 'https://www.apnews.com/search?q=trump&p=2',
         'info_dict': {
             'id': 'kevin',
             'title': 'kevin is nice man',

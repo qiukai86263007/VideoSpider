@@ -780,6 +780,7 @@ from .reuterssearch import ReutersSearchURLIE
 from .afpsearch import AfpSearchURLIE
 from .afpsearch import AfpIE
 from .apnewssearch import ApnewsIE
+from .bbc import BBCSearchURLIE
 from .goplay import GoPlayIE
 from .gopro import GoProIE
 from .goshgay import GoshgayIE

@@ -1836,3 +1836,62 @@ class BBCCoUkPlaylistIE(BBCCoUkPlaylistBaseIE):
         title = self._og_search_title(webpage, fatal=False)
         description = self._og_search_description(webpage)
         return title, description
+
+
+class BBCSearchBaseIE(InfoExtractor):
+    _SEARCH_TYPE = 'search'
+
+    def _entries(self, url, item_id, query=None, note='Downloading page %(page)s'):
+        query = query or {}
+        pages = [query['page']] if 'page' in query else itertools.count(0)
+        for page_num in pages:
+            query['page'] = str(page_num)
+            webpage = self._download_webpage(
+                url, item_id, query=query, note=note % {'page': page_num})
+            json_data = self._html_search_regex(
+                r'<script[^>]+id=(["\'])__NEXT_DATA__\1[^>]*>(?P<json>.+?)</script>',
+                webpage, 'initial data', default='{}', group='json')
+
+            # Parse the JSON data
+            parsed_data = self._parse_json(json_data, None, fatal=False)
+            search_terms=next(iter(parsed_data.get('props', {}).get('pageProps', {}).get('page', {}).values()), {})
+
+            # Filter results where metadata.contentType is 'video'
+            findlist = [
+                item for item in search_terms.get('results', [])
+                if item.get('metadata', {}).get('contentType') == 'video'
+            ]
+            if not findlist:
+                return
+
+            for url_items in findlist:
+                href = url_items.get("href")
+                urls = f'https://www.bbc.com{href}'
+                yield self.url_result(urls)
+
+
+    def _search_results(self, query, url):
+        return self._entries(url, query)
+
+
+class BBCSearchURLIE(BBCSearchBaseIE):
+    IE_DESC = 'BBC Video search'
+    IE_NAME = 'BBC:search_url'
+    _VALID_URL = r'https?://(?:www\.)?bbc\.com/search(?:/(?P<filter>communities|users|games))?(?:\?|\#!?)(?:.*?[&;])??q=(?P<id>(?:[^&#]+)+)'
+    _TESTS = [{
+        'url': 'https://www.bbc.com/search?q=trump',
+        'info_dict': {
+            'id': 'kevin',
+            'title': 'kevin is nice man',
+        },
+        'playlist_mincount': 45,
+        'params': {
+            'playlistend': 45,
+        },
+    }]
+    _PAGE_SIZE = 100
+
+    def _real_extract(self, url):
+        qs = parse_qs(url)
+        query = (qs.get('search_query') or qs.get('q'))[0]
+        return self.playlist_result(self._entries(url, query), query, query)
