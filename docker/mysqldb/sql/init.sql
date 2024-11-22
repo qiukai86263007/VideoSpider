@@ -71,7 +71,7 @@ CREATE TABLE IF NOT EXISTS `thumbnail_kvstore` (
 -- video.v_classification definition
 CREATE TABLE IF NOT EXISTS `v_classification` (
   `id` int NOT NULL AUTO_INCREMENT,
-  `title` varchar(100) DEFAULT NULL,
+  `title` varchar(255) DEFAULT NULL,
   `status` tinyint(1) DEFAULT '1',
   PRIMARY KEY (`id`)
 ) ENGINE=InnoDB AUTO_INCREMENT=112 DEFAULT CHARSET=utf8mb4;
@@ -125,7 +125,7 @@ UNLOCK TABLES;
 -- video.v_video definition
 CREATE TABLE IF NOT EXISTS `v_video` (
   `id` int NOT NULL AUTO_INCREMENT,
-  `title` varchar(100) DEFAULT NULL,
+  `title` varchar(255) DEFAULT NULL,
   `desc` varchar(4096) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci DEFAULT NULL,
   `classification_id` int DEFAULT NULL,
   `file` varchar(255) NOT NULL,

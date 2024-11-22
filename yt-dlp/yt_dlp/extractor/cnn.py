@@ -1,6 +1,6 @@
 import json
 import re
-
+import itertools
 from .common import InfoExtractor
 from ..utils import (
     clean_html,
@@ -13,12 +13,13 @@ from ..utils import (
     try_call,
     update_url,
     url_or_none,
+    parse_qs,
 )
 from ..utils.traversal import find_elements, traverse_obj
 
 
 class CNNIE(InfoExtractor):
-    _VALID_URL = r'https?://(?:(?:edition|www|money|cnnespanol)\.)?cnn\.com/(?!audio/)(?P<display_id>[^?#]+?)(?:[?#]|$|/index\.html)'
+    _VALID_URL = r'https?://(?:(?:edition|www|money|cnnespanol)\.)?cnn\.com/(?!audio/|search)(?P<display_id>[^?#]+?)(?:[?#]|$|/index\.html)'
 
     _TESTS = [{
         'url': 'https://www.cnn.com/2024/05/31/sport/video/jadon-sancho-borussia-dortmund-champions-league-exclusive-spt-intl',
@@ -252,7 +253,8 @@ class CNNIndonesiaIE(InfoExtractor):
             'description': 'md5:ece7b003b3ee7d81c6a5cfede7d5397d',
             'thumbnail': r're:https://akcdn\.detik\.net\.id/visual/2022/09/11/thumbnail-video-1_169\.jpeg',
             'title': 'VIDEO: Momen Charles Disambut Meriah usai Dilantik jadi Raja Inggris',
-            'tags': ['raja charles', 'raja charles iii', 'ratu elizabeth', 'ratu elizabeth meninggal dunia', 'raja inggris', 'inggris'],
+            'tags': ['raja charles', 'raja charles iii', 'ratu elizabeth', 'ratu elizabeth meninggal dunia',
+                     'raja inggris', 'inggris'],
             'age_limit': 0,
             'release_date': '20220911',
             'uploader': 'REUTERS',
@@ -275,3 +277,58 @@ class CNNIndonesiaIE(InfoExtractor):
             'upload_date': upload_date,
             'tags': try_call(lambda: self._html_search_meta('keywords', webpage).split(', ')),
         })
+
+
+class CNNSearchBaseIE(InfoExtractor):
+    _SEARCH_TYPE = 'search'
+    _API_URL = 'https://search.prod.di.api.cnn.io/content?q=%s&size=10&from=%s&page=%s&sort=newest&request_id=pdx-search-96c64437-0467-419e-af5c-c74c3dc692d1'
+    _API_HEADERS = {
+        'Referer': 'https://edition.cnn.com/',
+        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36',
+    }
+
+    def _entries(self, url, item_id, query=None, note='Downloading page %(page)s'):
+        query = query or {}
+        pages = [query['page']] if 'page' in query else itertools.count(1)
+        for page_num in pages:
+            query['page'] = str(page_num)
+            api_url = self._API_URL % (item_id, (page_num - 1) * 10, page_num)
+            json_parsed = self._download_json(
+                api_url,
+                item_id,
+                headers=self._API_HEADERS,
+                note=note % {'page': page_num})
+            if not json_parsed:
+                return
+            findlist = json_parsed.get('result', {})
+            if not findlist:
+                return
+            for url_items in findlist:
+                yield self.url_result(url_items['url'])
+
+    def _search_results(self, query, url):
+        return self._entries(url, query)
+
+
+class CNNSearchURLIE(CNNSearchBaseIE):
+    IE_DESC = 'cnn Video search'
+    IE_NAME = 'cnn:search_url'
+
+    _VALID_URL = r'https?://(?:www\.)?edition\.cnn\.com/search\?q=(?P<id>[^&#]+)'
+    _TESTS = [{
+        'url': 'https://edition.cnn.com/search?q=trump',
+        'info_dict': {
+            'id': 'kevin',
+            'title': 'kevin is nice man',
+        },
+        'playlist_mincount': 45,
+        'params': {
+            'playlistend': 45,
+        },
+    }]
+    _PAGE_SIZE = 100
+
+    def _real_extract(self, url):
+        qs = parse_qs(url)
+        query = (qs.get('searchtext') or qs.get('q'))[0]
+        return self.playlist_result(self._entries(url, query), query, query)

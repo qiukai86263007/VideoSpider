@@ -403,6 +403,7 @@ from .cnbc import CNBCVideoIE
 from .cnn import (
     CNNIE,
     CNNIndonesiaIE,
+    CNNSearchURLIE,
 )
 from .comedycentral import (
     ComedyCentralIE,
@@ -781,6 +782,9 @@ from .afpsearch import AfpSearchURLIE
 from .afpsearch import AfpIE
 from .apnewssearch import ApnewsIE
 from .bbc import BBCSearchURLIE
+from .nbcnewssearch import NBCNewsSearchURLIE
+from .abcnewssearch import ABCNewsSearchURLIE
+from .abcnewssearch import ABCNewsIE
 from .goplay import GoPlayIE
 from .gopro import GoProIE
 from .goshgay import GoshgayIE
