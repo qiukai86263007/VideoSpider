@@ -1,10 +1,11 @@
 import re
-
+from ..utils import parse_qs, traverse_obj
 from .common import InfoExtractor
+import itertools
 
 
 class BloombergIE(InfoExtractor):
-    _VALID_URL = r'https?://(?:www\.)?bloomberg\.com/(?:[^/]+/)*(?P<id>[^/?#]+)'
+    _VALID_URL = r'https?://(?:www\.)?bloomberg\.com/(?!search\?query=)(?:[^/]+/)*(?P<id>[^/?#]+)'
 
     _TESTS = [{
         'url': 'https://www.bloomberg.com/news/videos/2021-09-14/apple-unveils-the-new-iphone-13-stock-doesn-t-move-much-video',
@@ -40,9 +41,12 @@ class BloombergIE(InfoExtractor):
         'only_matching': True,
     }]
 
+    headers = {
+        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36',
+    }
     def _real_extract(self, url):
         name = self._match_id(url)
-        webpage = self._download_webpage(url, name)
+        webpage = self._download_webpage(url, name, headers=self.headers)
         video_id = self._search_regex(
             (r'["\']bmmrId["\']\s*:\s*(["\'])(?P<id>(?:(?!\1).)+)\1',
              r'videoId\s*:\s*(["\'])(?P<id>(?:(?!\1).)+)\1',
@@ -55,7 +59,7 @@ class BloombergIE(InfoExtractor):
         title = re.sub(': Video$', '', self._og_search_title(webpage))
 
         embed_info = self._download_json(
-            f'http://www.bloomberg.com/multimedia/api/embed?id={video_id}', video_id)
+            f'http://www.bloomberg.com/multimedia/api/embed?id={video_id}', video_id, headers=self.headers)
         formats = []
         for stream in embed_info['streams']:
             stream_url = stream.get('url')
@@ -75,3 +79,56 @@ class BloombergIE(InfoExtractor):
             'description': self._og_search_description(webpage),
             'thumbnail': self._og_search_thumbnail(webpage),
         }
+
+
+class BloombergSearchBaseIE(InfoExtractor):
+    _SEARCH_TYPE = 'search'
+    _API_URL = 'https://www.bloomberg.com/markets2/api/search?query=%s&page=%s&sort=time:desc&resource_subtypes=Video'
+    _API_HEADERS = {
+        'Referer': 'https://www.bloomberg.com',
+        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36',
+    }
+
+    def _entries(self, url, item_id, query=None, note='Downloading page %(page)s'):
+        query = query or {}
+        pages = [query['page']] if 'page' in query else itertools.count(1)
+        for page_num in pages:
+            query['page'] = str(page_num)
+            api_url = self._API_URL % (item_id, page_num)
+            json_parsed = self._download_json(
+                api_url,
+                item_id,
+                headers=self._API_HEADERS,
+                note=note % {'page': page_num})
+            # Find the data
+            findlist = json_parsed['results']
+            if not findlist:
+                return
+            for url_items in findlist:
+                yield self.url_result(url_items['url'])
+
+    def _search_results(self, query, url):
+        return self._entries(url, query)
+
+
+class BloombergSearchURLIE(BloombergSearchBaseIE):
+    IE_DESC = 'bloomberg Video search'
+    IE_NAME = 'bloomberg:search_url'
+    _VALID_URL = r'https?://(?:www\.)?bloomberg\.com/search\?query=(?P<id>[^&#]+)'
+    _TESTS = [{
+        'url': 'https://www.bloomberg.com/search?query=trump',
+        'info_dict': {
+            'id': 'kevin',
+            'title': 'kevin is nice man',
+        },
+        'playlist_mincount': 45,
+        'params': {
+            'playlistend': 45,
+        },
+    }]
+    _PAGE_SIZE = 100
+
+    def _real_extract(self, url):
+        qs = parse_qs(url)
+        query = (qs.get('query') or qs.get('q'))[0]
+        return self.playlist_result(self._entries(url, query), query, query)
