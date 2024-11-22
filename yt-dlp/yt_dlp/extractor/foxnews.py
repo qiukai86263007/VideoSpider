@@ -2,6 +2,9 @@ import re
 
 from .amp import AMPIE
 from .common import InfoExtractor
+from ..utils import parse_qs, traverse_obj
+import itertools
+import json
 
 
 class FoxNewsIE(AMPIE):
@@ -81,11 +84,11 @@ class FoxNewsIE(AMPIE):
     @classmethod
     def _extract_embed_urls(cls, url, webpage):
         for mobj in re.finditer(
-                r'''(?x)
-                    <(?:script|(?:amp-)?iframe)[^>]+\bsrc=["\']
-                    (?:https?:)?//video\.foxnews\.com/v/(?:video-embed\.html|embed\.js)\?
-                    (?:[^>"\']+&)?(?:video_)?id=(?P<video_id>\d+)
-                ''', webpage):
+            r'''(?x)
+                <(?:script|(?:amp-)?iframe)[^>]+\bsrc=["\']
+                (?:https?:)?//video\.foxnews\.com/v/(?:video-embed\.html|embed\.js)\?
+                (?:[^>"\']+&)?(?:video_)?id=(?P<video_id>\d+)
+            ''', webpage):
             yield f'https://video.foxnews.com/v/video-embed.html?video_id={mobj.group("video_id")}'
 
     def _real_extract(self, url):
@@ -183,3 +186,60 @@ class FoxNewsArticleIE(InfoExtractor):
 
         return self.url_result(
             next(FoxNewsIE._extract_embed_urls(url, webpage)), FoxNewsIE.ie_key())
+
+
+class FoxNewsSearchBaseIE(InfoExtractor):
+    _SEARCH_TYPE = 'search'
+    _API_URL = 'https://moxie.foxnews.com/search/web?q=%s&start=%s&callback=__jp%s'
+    _API_HEADERS = {
+        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36',
+    }
+
+    def _entries(self, url, item_id, query=None, note='Downloading page %(page)s'):
+        query = query or {}
+        pages = [query['page']] if 'page' in query else itertools.count(0)
+        for page_num in pages:
+            query['page'] = str(page_num)
+            api_url = self._API_URL % (item_id, page_num*10+1,page_num)
+            json_parsed = self._download_webpage(
+                api_url,
+                item_id,
+                note=note % {'page': page_num})
+            pattern = r'__jp\d+\((.*?)\)'
+            # Find the data
+            match_json = re.search(pattern, json_parsed)
+            if match_json:
+                data_str = match_json.group(1)
+                # Convert the JSON string to a dictionary
+                data_dict = json.loads(data_str)
+                findlist = data_dict['data']
+                if not findlist:
+                    return
+                for url_items in findlist:
+                    yield self.url_result(url_items['attributes']['canonical_url'])
+
+    def _search_results(self, query, url):
+        return self._entries(url, query)
+
+
+class FoxNewsSearchURLIE(FoxNewsSearchBaseIE):
+    IE_DESC = 'foxnews Video search'
+    IE_NAME = 'foxnews:search_url'
+    _VALID_URL = r'https?://(?:www\.)?foxnews\.com/search-results/search\?q=(?P<id>[^&#]+)'
+    _TESTS = [{
+        'url': 'https://www.foxnews.com/search-results/search?q=trump',
+        'info_dict': {
+            'id': 'kevin',
+            'title': 'kevin is nice man',
+        },
+        'playlist_mincount': 45,
+        'params': {
+            'playlistend': 45,
+        },
+    }]
+    _PAGE_SIZE = 100
+
+    def _real_extract(self, url):
+        qs = parse_qs(url)
+        query = (qs.get('searchtext') or qs.get('q'))[0]
+        return self.playlist_result(self._entries(url, query), query, query)

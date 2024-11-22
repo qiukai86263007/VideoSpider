@@ -672,9 +672,9 @@ from .fox9 import (
     FOX9NewsIE,
 )
 from .foxnews import (
-    FoxNewsArticleIE,
     FoxNewsIE,
     FoxNewsVideoIE,
+    FoxNewsSearchURLIE,
 )
 from .foxsports import FoxSportsIE
 from .fptplay import FptplayIE
