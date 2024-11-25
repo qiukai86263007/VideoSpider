@@ -2,6 +2,8 @@ import hashlib
 import hmac
 import re
 import time
+import itertools
+import json
 
 from .common import InfoExtractor
 from ..utils import (
@@ -16,12 +18,13 @@ from ..utils import (
     unescapeHTML,
     update_url_query,
     url_or_none,
+    parse_qs,
 )
 
 
 class ABCIE(InfoExtractor):
     IE_NAME = 'abc.net.au'
-    _VALID_URL = r'https?://(?:www\.)?abc\.net\.au/(?:news|btn)/(?:[^/]+/){1,4}(?P<id>\d{5,})'
+    _VALID_URL = r'https?://(?:www\.)?abc\.net\.au/(?:news|btn|chinese)/(?:[^/]+/){1,4}(?P<id>\d{5,})'
 
     _TESTS = [{
         'url': 'http://www.abc.net.au/news/2014-11-05/australia-to-staff-ebola-treatment-centre-in-sierra-leone/5868334',
@@ -427,3 +430,64 @@ class ABCIViewShowSeriesIE(InfoExtractor):
             'thumbnail': traverse_obj(
                 series, 'thumbnail', ('images', lambda _, v: v['name'] == 'seriesThumbnail', 'url'), get_all=False),
         }
+
+
+class ABCSearchBaseIE(InfoExtractor):
+    _SEARCH_TYPE = 'search'
+    _API_URL = 'https://y63q32nvdl-dsn.algolia.net/1/indexes/*/queries?x-algolia-agent=Algolia%20for%20JavaScript%20(4.18.0)%3B%20Browser%20(lite)%3B%20instantsearch.js%20(4.54.0)%3B%20react%20(18.2.0)%3B%20react-instantsearch%20(6.38.1)%3B%20react-instantsearch-hooks%20(6.38.1)%3B%20JS%20Helper%20(3.13.3)&x-algolia-api-key=bcdf11ba901b780dc3c0a3ca677fbefc&x-algolia-application-id=Y63Q32NVDL'
+    _API_HEADERS = {
+        'Referer': 'https://discover.abc.net.au/',
+        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36',
+    }
+
+    def _entries(self, url, item_id, query=None, note='Downloading page %(page)s'):
+        query = query or {}
+        pages = [query['page']] if 'page' in query else itertools.count(0)
+        for page_num in pages:
+            query['page'] = str(page_num)
+            api_url = self._API_URL
+            json_parsed = self._download_json(
+                api_url,
+                item_id,
+                headers=self._API_HEADERS,
+                data=json.dumps({
+                    'requests': [{
+                        'indexName': 'ABC_production_all',
+                        'params': 'clickAnalytics=true&facets=%5B%22site.title%22%5D&getRankingInfo=true&hitsPerPage=10&maxValuesPerFacet=20&page={page}&query={query}&ruleContexts=%5B%22global_search%22%5D&tagFilters=&userToken=ABC_SEARCH_USER'.format(
+                            query=item_id, page=page_num),
+                    }],
+                }).encode('utf-8'),
+                note=note % {'page': page_num})
+            if not json_parsed:
+                return
+            findlist = json_parsed['results'][0]['hits']
+            if not findlist:
+                return
+            for url_items in findlist:
+                yield self.url_result(url_items['canonicalURL'])
+
+    def _search_results(self, query, url):
+        return self._entries(url, query)
+
+
+class ABCSearchURLIE(ABCSearchBaseIE):
+    IE_DESC = 'abcnews AU Video search'
+    IE_NAME = 'abcnews.au:search_url'
+    _VALID_URL = r'https?://(?:www\.)?discover\.abc\.net\.au/#/\?query=(?P<id>[^&#]+)'
+    _TESTS = [{
+        'url': 'https://discover.abc.net.au/#/?query=trump',
+        'info_dict': {
+            'id': 'kevin',
+            'title': 'kevin is nice man',
+        },
+        'playlist_mincount': 45,
+        'params': {
+            'playlistend': 45,
+        },
+    }]
+    _PAGE_SIZE = 100
+
+    def _real_extract(self, url):
+        qs = url.split('?', 1)[-1]
+        query = qs.split('=')[-1]
+        return self.playlist_result(self._entries(url, query), query, query)

@@ -31,6 +31,7 @@ from .abc import (
     ABCIE,
     ABCIViewIE,
     ABCIViewShowSeriesIE,
+    ABCSearchURLIE,
 )
 from .abcnews import (
     AbcNewsIE,
