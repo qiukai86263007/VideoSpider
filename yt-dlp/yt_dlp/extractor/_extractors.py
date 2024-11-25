@@ -33,6 +33,7 @@ from .abc import (
     ABCIViewShowSeriesIE,
     ABCSearchURLIE,
 )
+from .indiatimes import IndiaTimesSearchURLIE,IndiaTimesIE
 from .abcnews import (
     AbcNewsIE,
     AbcNewsVideoIE,
