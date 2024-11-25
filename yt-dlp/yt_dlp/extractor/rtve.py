@@ -1,7 +1,8 @@
 import base64
 import io
 import struct
-
+import itertools
+import re
 from .common import InfoExtractor
 from ..utils import (
     ExtractorError,
@@ -11,7 +12,9 @@ from ..utils import (
     remove_end,
     remove_start,
     try_get,
+    parse_qs,
 )
+from bs4 import BeautifulSoup
 
 
 class RTVEALaCartaIE(InfoExtractor):
@@ -76,8 +79,11 @@ class RTVEALaCartaIE(InfoExtractor):
                 break
             data = encrypted_data.read(length)
             if chunk_type == b'tEXt':
-                alphabet_data, text = data.split(b'\0')
-                quality, url_data = text.split(b'%%')
+                alphabet_data, text = data.replace(b'\0', b'').split(b'#')
+                components = text.split(b'%%')
+                if len(components) < 2:
+                    components.insert(0, b'')
+                    quality, url_data = components
                 alphabet = []
                 e = 0
                 d = 0
@@ -340,3 +346,62 @@ class RTVETelevisionIE(InfoExtractor):
                 'The webpage doesn\'t contain any video', expected=True)
 
         return self.url_result(alacarta_url, ie=RTVEALaCartaIE.ie_key())
+
+
+
+class RTVESearchBaseIE(InfoExtractor):
+    _SEARCH_TYPE = 'search'
+
+    def _entries(self, url, item_id, query=None, note='Downloading page %(page)s'):
+        query = query or {}
+        pages = [query['start']] if 'start' in query else itertools.count(1)
+        for page_num in pages:
+            query['start'] = str(page_num)
+            webpage = self._download_webpage(
+                    url, item_id, query=query, note=note % {'page': page_num})
+            soup = BeautifulSoup(webpage, 'html.parser')
+            div_list_result = soup.find(id='divListResult')
+            if not div_list_result:
+                raise ExtractorError('No div with id "divListResult" found', expected=True)
+
+            articles = div_list_result.find_all('article')
+            findlist = []
+            for article in articles:
+                txt_box = article.find(class_='txtBox')
+                if txt_box:
+                    h2 = txt_box.find('h2')
+                    if h2:
+                        a_tag = h2.find('a')
+                        if a_tag and 'href' in a_tag.attrs:
+                            findlist.append(a_tag['href'])
+            if not findlist:
+                return
+            for url_items in findlist:
+                yield self.url_result(url_items)
+
+    def _search_results(self, query, url):
+        return self._entries(url, query)
+
+
+class RTVESearchURLIE(RTVESearchBaseIE):
+
+    IE_DESC = 'RTVE Video search'
+    IE_NAME = 'rtve:search_url'
+    _VALID_URL = r'https?://(?:www\.)?rtve\.es/buscador\?q=(?P<id>[^&#]+)'
+    _TESTS = [{
+        'url': 'https://www.rtve.es/buscador?q=trump',
+        'info_dict': {
+            'id': 'kevin',
+            'title': 'kevin is nice man',
+        },
+        'playlist_mincount': 45,
+        'params': {
+            'playlistend': 45,
+        },
+    }]
+    _PAGE_SIZE = 100
+
+    def _real_extract(self, url):
+        qs = parse_qs(url)
+        query = (qs.get('qt') or qs.get('q'))[0]
+        return self.playlist_result(self._entries(url, query), query, query)

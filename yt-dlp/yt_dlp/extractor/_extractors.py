@@ -279,6 +279,7 @@ from .blerp import BlerpIE
 from .blogger import BloggerIE
 from .bloomberg import BloombergIE
 from .bloomberg import BloombergSearchURLIE
+from .nhksearch import NHKSearchURLIE, NHKSearchIE
 from .bluesky import BlueskyIE
 from .bokecc import BokeCCIE
 from .bongacams import BongaCamsIE
@@ -1778,6 +1779,7 @@ from .rtve import (
     RTVEInfantilIE,
     RTVELiveIE,
     RTVETelevisionIE,
+    RTVESearchURLIE,
 )
 from .rtvs import RTVSIE
 from .rtvslo import (
