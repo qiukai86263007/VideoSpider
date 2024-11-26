@@ -1,11 +1,13 @@
 import json
 import math
-
-from .common import InfoExtractor
+import itertools
+import re
+from .common import InfoExtractor, ExtractorError
 from ..utils import (
     InAdvancePagedList,
     traverse_obj,
 )
+from bs4 import BeautifulSoup
 
 
 class LeFigaroVideoEmbedIE(InfoExtractor):
@@ -134,3 +136,85 @@ class LeFigaroVideoSectionIE(InfoExtractor):
             page_func, math.ceil(initial_response['videoCount'] / self._PAGE_SIZE), self._PAGE_SIZE)
 
         return self.playlist_result(entries, playlist_id=display_id, playlist_title=initial_response.get('title'))
+
+
+class LeFigaroIE(InfoExtractor):
+    _VALID_URL = r'https?://www.lefigaro\.fr(?:/[^?#]+)*/(?P<id>[\w-]+)/?(?:[#?]|$)'
+
+    _TESTS = [{
+        'url': 'https://www.lefigaro.fr/international/a-butler-les-supporters-de-trump-saluent-son-cran-20241006',
+        'info_dict': {
+            'id': 'le-club-le-figaro-idees',
+            'title': 'Le Club Le Figaro Idées',
+        },
+        'playlist_mincount': 14,
+    }]
+
+
+    def _real_extract(self, url):
+        display_id = self._match_id(url)
+        webpage = self._download_webpage(url, display_id)
+        json_ld =self._html_search_regex(
+            r'<script[^>]+type="application/ld\+json"[^>]*>(.*?)</script>',
+            webpage, 'json_ld', default='{}', flags=re.DOTALL)
+        if not json_ld:
+            raise ExtractorError('No JSON-LD found', expected=True)
+        parsed_data = self._parse_json(json_ld, None, fatal=False)
+        urls = parsed_data[-1]['video']['embedUrl']
+        return self.url_result(urls)
+
+class LefigaroSearchBaseIE(InfoExtractor):
+    _SEARCH_TYPE = 'search'
+    _API_HEADERS = {
+        'Referer': 'https://recherche.lefigaro.fr/',
+        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36',
+    }
+    def _entries(self, url, item_id, query=None, note='Downloading page %(page)s'):
+        query = query or {}
+        pages = [query['page']] if 'page' in query else itertools.count(1)
+        for page_num in pages:
+            query['page'] = str(page_num)
+            webpage = self._download_webpage(url, item_id, query=query, headers=self._API_HEADERS,
+                                             note=note % {'page': page_num})
+            soup = BeautifulSoup(webpage, 'html.parser')
+            div_list_result = soup.find(id='articles-list')
+            if not div_list_result:
+                raise ExtractorError('No div with id "divListResult" found', expected=True)
+            findlist = []
+            items = div_list_result.find_all('article')
+            for item in items:
+                h2_tag = item.find('h2')
+                if not h2_tag:
+                    continue
+                a_tag = h2_tag.find('a')
+                if a_tag and 'href' in a_tag.attrs:
+                    findlist.append(a_tag['href'])
+            if not findlist:
+                return
+            for url_items in findlist:
+                yield self.url_result(url_items)
+
+    def _search_results(self, query, url):
+        return self._entries(url, query)
+
+
+class LefigaroSearchURLIE(LefigaroSearchBaseIE):
+    IE_DESC = 'Lefigaro Video search'
+    IE_NAME = 'lefigaro:search_url'
+    _VALID_URL = r'https?://(?:www\.)?recherche\.lefigaro\.fr/recherche/(?P<id>[^/]+)/?'
+    _TESTS = [{
+        'url': 'https://recherche.lefigaro.fr/recherche/trump/',
+        'info_dict': {
+            'id': 'kevin',
+            'title': 'kevin is nice man',
+        },
+        'playlist_mincount': 45,
+        'params': {
+            'playlistend': 45,
+        },
+    }]
+    _PAGE_SIZE = 100
+
+    def _real_extract(self, url):
+        query = self._match_id(url)
+        return self.playlist_result(self._entries(url, query), query, query)

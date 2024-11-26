@@ -1025,6 +1025,8 @@ from .leeco import (
 from .lefigaro import (
     LeFigaroVideoEmbedIE,
     LeFigaroVideoSectionIE,
+    LefigaroSearchURLIE,
+    LeFigaroIE,
 )
 from .lego import LEGOIE
 from .lemonde import LemondeIE
