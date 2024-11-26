@@ -45,8 +45,8 @@ def download_video(url):
             '--sleep-subtitles','1' ,
             # '--sleep-requests','1',
             '--sleep-interval','1',
-            '--username', '4684390@qq.com',
-            '--password', 'Qk4684390!',
+            # '--username', '4684390@qq.com',
+            # '--password', 'Qk4684390!',
             '-o', os.path.join(current_dir, '..', 'upload', '%(id)s.%(ext)s'),
             url
         ]

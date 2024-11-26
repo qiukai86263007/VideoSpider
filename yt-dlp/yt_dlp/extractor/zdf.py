@@ -1,5 +1,5 @@
 import re
-
+import itertools
 from .common import InfoExtractor
 from ..utils import (
     NO_DEFAULT,
@@ -19,6 +19,7 @@ from ..utils import (
     url_or_none,
     urljoin,
 )
+from bs4 import BeautifulSoup
 
 
 class ZDFBaseIE(InfoExtractor):
@@ -374,7 +375,7 @@ class ZDFIE(ZDFBaseIE):
 
 
 class ZDFChannelIE(ZDFBaseIE):
-    _VALID_URL = r'https?://www\.zdf\.de/(?:[^/]+/)*(?P<id>[^/?#&]+)'
+    _VALID_URL = r'https?://www\.zdf\.de/(?!suche)(?:[^/]+/)*(?P<id>[^/?#&]+)'
     _TESTS = [{
         'url': 'https://www.zdf.de/sport/das-aktuelle-sportstudio',
         'info_dict': {
@@ -439,3 +440,53 @@ class ZDFChannelIE(ZDFBaseIE):
         return self.playlist_from_matches(
             (m.group('url') for m in matches if check_video(m)),
             channel_id, self._og_search_title(webpage, fatal=False))
+
+
+class ZDFSearchBaseIE(InfoExtractor):
+    _SEARCH_TYPE = 'search'
+
+
+    def _entries(self, url, item_id, query=None, note='Downloading page %(page)s'):
+        query = query or {}
+        pages = [query['page']] if 'page' in query else itertools.count(1)
+        for page_num in pages:
+            query['page'] = str(page_num)
+            webpage = self._download_webpage(url, item_id, query=query,
+                                             note=note % {'page': page_num})
+            soup = BeautifulSoup(webpage, 'html.parser')
+            div_list_result = soup.find(id='main-content')
+
+            if not div_list_result:
+                raise ExtractorError('No div with id "divListResult" found', expected=True)
+            article = div_list_result.find_all('article', recursive=False)[-1]
+            a_tags = article.find_all('a', href=True)
+            findlist = [f'https://www.zdf.de{a["href"]}' for a in a_tags if a['href'].endswith('.html')]
+            if not findlist:
+                return
+            for url_items in findlist:
+                yield self.url_result(url_items)
+
+    def _search_results(self, query, url):
+        return self._entries(url, query)
+
+
+class ZDFSearchURLIE(ZDFSearchBaseIE):
+    IE_DESC = 'ZDF Video search'
+    IE_NAME = 'zdf:search_url'
+    _VALID_URL = r'https?://(?:www\.)?zdf\.de/suche\?q=(?P<id>[^&#]+)'
+    _TESTS = [{
+        'url': 'https://www.zdf.de/suche?q=trump',
+        'info_dict': {
+            'id': 'kevin',
+            'title': 'kevin is nice man',
+        },
+        'playlist_mincount': 45,
+        'params': {
+            'playlistend': 45,
+        },
+    }]
+    _PAGE_SIZE = 100
+
+    def _real_extract(self, url):
+        query = self._match_id(url)
+        return self.playlist_result(self._entries(url, query), query, query)
