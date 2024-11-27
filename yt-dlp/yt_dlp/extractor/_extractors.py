@@ -343,6 +343,7 @@ from .cbc import (
     CBCGemPlaylistIE,
     CBCPlayerIE,
     CBCPlayerPlaylistIE,
+    CBCSearchURLIE,
 )
 from .cbs import (
     CBSIE,

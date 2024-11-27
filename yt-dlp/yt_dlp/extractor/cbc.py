@@ -4,6 +4,7 @@ import json
 import re
 import time
 import urllib.parse
+import itertools
 
 from .common import InfoExtractor
 from ..networking import HEADRequest
@@ -23,6 +24,7 @@ from ..utils import (
     update_url,
     url_basename,
     url_or_none,
+    parse_qs,
 )
 
 
@@ -890,3 +892,57 @@ class CBCGemLiveIE(InfoExtractor):
                 'thumbnail': ('images', 'card', 'url'),
             }),
         }
+
+
+class CBCSearchBaseIE(InfoExtractor):
+    _SEARCH_TYPE = 'search'
+    _API_URL = 'https://www.cbc.ca/search_api/v1/search?q={query}&sortOrder=relevance&media=video&boost-cbc-keywords=7&boost-cbc-keywordscollections=7&boost-cbc-keywordslocation=4&boost-cbc-keywordsorganization=3&boost-cbc-keywordsperson=5&page={page}&fields=feed'
+    _API_HEADERS = {
+        'Referer': 'https://www.cbc.ca/',
+        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36',
+    }
+
+    def _entries(self, url, item_id, query=None, note='Downloading page %(page)s'):
+        query = query or {}
+        pages = [query['page']] if 'page' in query else itertools.count(1)
+        for page_num in pages:
+            query['page'] = str(page_num)
+            json_parsed = self._download_json(
+                self._API_URL.format(query=item_id, page=page_num),
+                item_id,
+                headers=self._API_HEADERS,
+                note=note % {'page': page_num})
+            # Find the data
+            findlist = json_parsed
+            if not findlist:
+                return
+            for url_items in findlist:
+                proto_base = 'https:'
+                full_url = proto_base + url_items['url']
+                yield self.url_result(full_url)
+
+    def _search_results(self, query, url):
+        return self._entries(url, query)
+
+
+class CBCSearchURLIE(CBCSearchBaseIE):
+    IE_DESC = 'CBC Video search'
+    IE_NAME = 'cbc:search_url'
+    _VALID_URL = r'https?://(?:www\.)?cbc\.ca/search\?q=(?P<id>[^&#]+)'
+    _TESTS = [{
+        'url': 'https://www.cbc.ca/search?q=trump',
+        'info_dict': {
+            'id': 'kevin',
+            'title': 'kevin is nice man',
+        },
+        'playlist_mincount': 45,
+        'params': {
+            'playlistend': 45,
+        },
+    }]
+    _PAGE_SIZE = 100
+
+    def _real_extract(self, url):
+        qs = parse_qs(url)
+        query = (qs.get('qt') or qs.get('q'))[0]
+        return self.playlist_result(self._entries(url, query), query, query)
