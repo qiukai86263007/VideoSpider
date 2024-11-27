@@ -1681,6 +1681,7 @@ from .rai import (
     RaiPlaySoundLiveIE,
     RaiPlaySoundPlaylistIE,
     RaiSudtirolIE,
+    RaiNewsSearchURLIE,
 )
 from .raywenderlich import (
     RayWenderlichCourseIE,

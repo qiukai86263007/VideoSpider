@@ -1,5 +1,6 @@
 import re
-
+import json
+import itertools
 from .common import InfoExtractor
 from ..networking import HEADRequest
 from ..utils import (
@@ -20,6 +21,7 @@ from ..utils import (
     update_url_query,
     urljoin,
     xpath_text,
+    parse_qs,
 )
 
 
@@ -704,6 +706,7 @@ class RaiNewsIE(RaiBaseIE):
             transform_source=clean_html, default={})
         track_info = player_data.get('track_info')
         relinker_url = traverse_obj(player_data, 'mediapolis', 'content_url')
+        thumbnail = 'https://www.rainews.it' + player_data['image']
 
         if not relinker_url:
             # fallback on old implementation for some old content
@@ -718,6 +721,7 @@ class RaiNewsIE(RaiBaseIE):
 
         return {
             'id': video_id,
+            'thumbnail': thumbnail,
             'title': player_data.get('title') or track_info.get('title') or self._og_search_title(webpage),
             'upload_date': unified_strdate(track_info.get('date')),
             'uploader': strip_or_none(track_info.get('editor') or None),
@@ -814,3 +818,69 @@ class RaiSudtirolIE(RaiBaseIE):
             'uploader': 'raisudtirol',
             'formats': formats,
         }
+
+
+class RaiNewsSearchBaseIE(InfoExtractor):
+    _SEARCH_TYPE = 'search'
+    _API_URL = 'https://www.rainews.it/atomatic/news-search-service/api/v3/search'
+    _API_HEADERS = {
+        'Referer': 'https://www.rainews.it/',
+        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36',
+        'Content-Type': 'application/json',
+    }
+
+    def _entries(self, url, item_id, query=None, note='Downloading page %(page)s'):
+        query = query or {}
+        pages = [query['page']] if 'page' in query else itertools.count(0)
+        for page_num in pages:
+            query['page'] = str(page_num)
+            request_body = {
+                "page": page_num * 16,
+                "pageSize": 16,
+                "filters": {
+                    "dominio": "RaiNews|Category-60bbaf3f-99b8-4aac-8a6d-69a98e11bfc1"
+                },
+                "post_filters": None,
+                "mode": "searchByText",
+                "param": item_id
+            }
+            json_parsed = self._download_json(
+                self._API_URL,
+                item_id, data=json.dumps(request_body).encode('utf-8'),
+                headers=self._API_HEADERS,
+                note=note % {'page': page_num})
+            # Find the data
+            findlist = json_parsed['hits']
+            if not findlist:
+                return
+            for url_items in findlist:
+                url_base = 'https://www.rainews.it'
+                full_url = url_base + url_items['weblink'] if url_items['weblink'].startswith('/video') else None
+                if full_url:
+                    yield self.url_result(full_url)
+
+    def _search_results(self, query, url):
+        return self._entries(url, query)
+
+
+class RaiNewsSearchURLIE(RaiNewsSearchBaseIE):
+    IE_DESC = 'RAI Video search'
+    IE_NAME = 'rai:search_url'
+    _VALID_URL = r'https?://(?:www\.)?rainews\.it/ricerca.html\?q=(?P<id>[^&#]+)'
+    _TESTS = [{
+        'url': 'https://www.rainews.it/ricerca.html?q=trump',
+        'info_dict': {
+            'id': 'kevin',
+            'title': 'kevin is nice man',
+        },
+        'playlist_mincount': 45,
+        'params': {
+            'playlistend': 45,
+        },
+    }]
+    _PAGE_SIZE = 100
+
+    def _real_extract(self, url):
+        qs = parse_qs(url)
+        query = (qs.get('qt') or qs.get('q'))[0]
+        return self.playlist_result(self._entries(url, query), query, query)
